@@ -11,8 +11,8 @@
                     id: 2,
                     type: "table",
                     table: {
-                        columns: ["Column 1", "Column 2"],
-                        rows: [["Row 1-1", "Row 1-2"]],
+                        columns: ["Vilius", "Viliaus enemy"],
+                        rows: [["1.52", "1.51"]],
                     },
                 },
             ],
@@ -84,9 +84,21 @@
     $: filteredFolders = $folders.map((folder) => {
         return {
             ...folder,
-            notes: folder.notes.filter((note) =>
-                note.content?.toLowerCase().includes(searchTerm.toLowerCase()),
-            ),
+            notes: folder.notes.filter((note) => {
+                if (note.type === "simple") {
+                    return note.content?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false;
+                } else if (note.type === "table" && note.table) {
+                    // Search in table columns and rows
+                    const columnsMatch = note.table.columns.some(col => 
+                        col.toLowerCase().includes(searchTerm.toLowerCase())
+                    );
+                    const rowsMatch = note.table.rows.some(row =>
+                        row.some(cell => cell.toLowerCase().includes(searchTerm.toLowerCase()))
+                    );
+                    return columnsMatch || rowsMatch;
+                }
+                return false;
+            }),
         };
     });
 </script>
