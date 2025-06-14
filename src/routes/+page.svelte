@@ -4,9 +4,9 @@
     export let folders = writable([
         {
             id: 1,
-            name: "General",
+            name: "Moza",
             notes: [
-                { id: 1, type: "simple", content: "This is a simple note" },
+                { id: 1, type: "simple", content: "Moza times" },
                 {
                     id: 2,
                     type: "table",
@@ -17,7 +17,23 @@
                 },
             ],
         },
-    ]);
+        {
+            id: 2,
+            name: "SPA",
+            notes: [
+                { id: 1, type: "simple", content: "SPA times" },
+                {
+                    id: 2,
+                    type: "table",
+                    table: {
+                        columns: ["Vilius", "Viliaus enemy"],
+                        rows: [["2:26", "2:25"]],
+                    },
+                },
+            ],
+        }
+    ],
+);
 
     let newFolderName = "";
     let searchTerm = "";
