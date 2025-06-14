@@ -38,6 +38,59 @@
     let newFolderName = "";
     let searchTerm = "";
     let newNoteContent = "";
+    let editingNoteId: number | null = null;
+    let editingCell: { noteId: number, rowIndex: number, colIndex: number } | null = null;
+
+    function editNote(folderId: number, noteId: number, newContent: string) {
+        folders.update((current) =>
+            current.map((folder) =>
+                folder.id === folderId
+                    ? {
+                          ...folder,
+                          notes: folder.notes.map((note) => {
+                              if (note.id === noteId && note.type === "simple") {
+                                  return {
+                                      id: note.id,
+                                      type: note.type,
+                                      content: newContent
+                                  };
+                              }
+                              return note;
+                          }),
+                      }
+                    : folder
+            )
+        );
+        editingNoteId = null;
+    }
+
+    function editTableCell(folderId: number, noteId: number, rowIndex: number, colIndex: number, newValue: string) {
+        folders.update((current) =>
+            current.map((folder) =>
+                folder.id === folderId
+                    ? {
+                          ...folder,
+                          notes: folder.notes.map((note) => {
+                              if (note.id === noteId && note.type === "table" && note.table) {
+                                  const newRows = [...note.table.rows];
+                                  newRows[rowIndex] = [...newRows[rowIndex]];
+                                  newRows[rowIndex][colIndex] = newValue;
+                                  return {
+                                      ...note,
+                                      table: {
+                                          ...note.table,
+                                          rows: newRows
+                                      }
+                                  };
+                              }
+                              return note;
+                          }),
+                      }
+                    : folder
+            )
+        );
+        editingCell = null;
+    }
 
     function addFolder() {
         folders.update((current) => [
@@ -153,7 +206,33 @@
                     <li class="bg-gray-100 p-2 rounded-md shadow-md flex justify-between items-center">
                         <div class="flex-1">
                             {#if note.type == "simple"}
-                                {note.content}
+                                {#if editingNoteId === note.id}
+                                    <input
+                                        type="text"
+                                        value={note.content}
+                                        class="w-full p-1 border rounded"
+                                        on:keydown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                editNote(folder.id, note.id, (e.target as HTMLInputElement).value);
+                                            } else if (e.key === 'Escape') {
+                                                editingNoteId = null;
+                                            }
+                                        }}
+                                    />
+                                {:else}
+                                    <div 
+                                        role="button"
+                                        tabindex="0"
+                                        on:dblclick={() => editingNoteId = note.id}
+                                        on:keydown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                editingNoteId = note.id;
+                                            }
+                                        }}
+                                    >
+                                        {note.content}
+                                    </div>
+                                {/if}
                             {:else}
                                 <table class="min-w-full divide-y divide-gray-200">
                                     <thead>
@@ -170,13 +249,40 @@
                                     </thead>
                                     <tbody>
                                         {#if note.table}
-                                            {#each note.table.rows as row}
+                                            {#each note.table.rows as row, row_index}
                                                 <tr>
-                                                    {#each row as cell}
+                                                    {#each row as cell, cell_index}
                                                         <td
                                                             class="px-4 py-2 border-gray-300 border-t border-b"
-                                                            >{cell}</td
                                                         >
+                                                            {#if editingCell && editingCell.noteId === note.id && editingCell.rowIndex === row_index && editingCell.colIndex === cell_index}
+                                                                <input
+                                                                    type="text"
+                                                                    value={cell}
+                                                                    class="w-full p-1 border rounded"
+                                                                    on:keydown={(e) => {
+                                                                        if (e.key === 'Enter') {
+                                                                            editTableCell(folder.id, note.id, row_index, cell_index, (e.target as HTMLInputElement).value);
+                                                                        } else if (e.key === 'Escape') {
+                                                                            editingCell = null;
+                                                                        }
+                                                                    }}
+                                                                />
+                                                            {:else}
+                                                                <div 
+                                                                    role="button"
+                                                                    tabindex="0"
+                                                                    on:dblclick={() => editingCell = { noteId: note.id, rowIndex: row_index, colIndex: cell_index }}
+                                                                    on:keydown={(e) => {
+                                                                        if (e.key === 'Enter') {
+                                                                            editingCell = { noteId: note.id, rowIndex: row_index, colIndex: cell_index };
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    {cell}
+                                                                </div>
+                                                            {/if}
+                                                        </td>
                                                     {/each}
                                                 </tr>
                                             {/each}
