@@ -38,6 +38,7 @@
     let searchTerm = "";
     let newNoteContent = "";
     let editingNoteId: number | null = null;
+    let selectedFolderId: number | null = null;
     let editingCell: {
         noteId: number;
         rowIndex: number;
@@ -223,17 +224,33 @@
             <h2 class="text-lg font-semibold mb-2">Folders</h2>
             <ul class="space-y-2">
                 {#each $folders as folder}
-                    <li
-                        class="flex items-center justify-between p-2 hover:bg-gray-100 rounded-md"
+                    <div 
+                        role="button"
+                        tabindex="0"
+                        class="flex items-center justify-between p-2 rounded-md cursor-pointer"
+                        class:bg-blue-100={selectedFolderId === folder.id}
+                        class:hover:bg-gray-100={selectedFolderId !== folder.id}
+                        on:click={() => selectedFolderId = folder.id}
+                        on:keydown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                selectedFolderId = folder.id;
+                            }
+                        }}
                     >
                         <span>{folder.name}</span>
                         <button
-                            on:click={() => deleteFolder(folder.id)}
+                            type="button"
+                            on:click={(e) => {
+                                e.stopPropagation();
+                                deleteFolder(folder.id);
+                                if (selectedFolderId === folder.id) selectedFolderId = null;
+                            }}
                             class="text-red-500 hover:text-red-600"
                         >
                             ×
                         </button>
-                    </li>
+                    </div>
                 {/each}
             </ul>
         </div>
@@ -241,19 +258,20 @@
 
     <!-- Main content -->
     <div class="flex-1 p-6 overflow-y-auto">
-        <!-- Search bar -->
-        <div class="mb-6">
-            <input
-                bind:value={searchTerm}
-                placeholder="Search notes"
-                class="w-full p-3 border rounded-lg shadow-sm"
-            />
-        </div>
+        {#if selectedFolderId}
+            <!-- Search bar -->
+            <div class="mb-6">
+                <input
+                    bind:value={searchTerm}
+                    placeholder="Search notes"
+                    class="w-full p-3 border rounded-lg shadow-sm"
+                />
+            </div>
 
-        <!-- Notes list -->
-        <div class="space-y-6">
-            {#each filteredFolders as folder}
-                <div class="bg-white rounded-lg shadow-md p-6">
+            <!-- Notes list -->
+            <div class="space-y-6">
+                {#each filteredFolders.filter(f => f.id === selectedFolderId) as folder}
+                    <div class="bg-white rounded-lg shadow-md p-6">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-xl font-semibold">{folder.name}</h3>
                         <div class="flex gap-2">
@@ -441,6 +459,14 @@
                     </div>
                 </div>
             {/each}
-        </div>
+            </div>
+        {:else}
+            <div class="flex items-center justify-center h-full">
+                <div class="text-center text-gray-500">
+                    <h2 class="text-2xl font-semibold mb-2">Welcome to Notes App</h2>
+                    <p>Select a folder from the sidebar to view its notes</p>
+                </div>
+            </div>
+        {/if}
     </div>
 </div>
