@@ -37,6 +37,7 @@
     let newFolderName = "";
     let searchTerm = "";
     let newNoteContent = "";
+    let newTableColumns = "";
     let editingNoteId: number | null = null;
     let selectedFolderId: number | null = null;
     let editingCell: {
@@ -153,6 +154,65 @@
         newNoteContent = "";
     }
 
+    function addTableNoteToFolder(id: number, columnsStr: string) {
+        if (!columnsStr.trim()) return;
+        const columns = columnsStr.split(",").map((col) => col.trim());
+        if (columns.length === 0) return;
+
+        folders.update((current) =>
+            current.map((folder) =>
+                folder.id === id
+                    ? {
+                          ...folder,
+                          notes: [
+                              ...folder.notes,
+                              {
+                                  id: Date.now(),
+                                  type: "table",
+                                  table: {
+                                      columns: columns,
+                                      rows: [columns.map(() => "")],
+                                  },
+                              },
+                          ],
+                      }
+                    : folder,
+            ),
+        );
+        newTableColumns = "";
+    }
+
+    function addRowToTable(folderId: number, noteId: number) {
+        folders.update((current) =>
+            current.map((folder) =>
+                folder.id === folderId
+                    ? {
+                          ...folder,
+                          notes: folder.notes.map((note) => {
+                              if (
+                                  note.id === noteId &&
+                                  note.type === "table" &&
+                                  note.table
+                              ) {
+                                  return {
+                                      ...note,
+                                      table: {
+                                          ...note.table,
+                                          rows: [
+                                              ...note.table.rows,
+                                              note.table.columns.map(() => ""),
+                                          ],
+                                      },
+                                  };
+                              }
+                              return note;
+                          }),
+                      }
+                    : folder,
+            ),
+        );
+    }
+
     // New function to delete a note from a folder
     function deleteNote(folderId: number, noteId: number) {
         folders.update((current) =>
@@ -224,15 +284,15 @@
             <h2 class="text-lg font-semibold mb-2">Folders</h2>
             <ul class="space-y-2">
                 {#each $folders as folder}
-                    <div 
+                    <div
                         role="button"
                         tabindex="0"
                         class="flex items-center justify-between p-2 rounded-md cursor-pointer"
                         class:bg-blue-100={selectedFolderId === folder.id}
                         class:hover:bg-gray-100={selectedFolderId !== folder.id}
-                        on:click={() => selectedFolderId = folder.id}
+                        on:click={() => (selectedFolderId = folder.id)}
                         on:keydown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
+                            if (e.key === "Enter" || e.key === " ") {
                                 e.preventDefault();
                                 selectedFolderId = folder.id;
                             }
@@ -244,7 +304,8 @@
                             on:click={(e) => {
                                 e.stopPropagation();
                                 deleteFolder(folder.id);
-                                if (selectedFolderId === folder.id) selectedFolderId = null;
+                                if (selectedFolderId === folder.id)
+                                    selectedFolderId = null;
                             }}
                             class="text-red-500 hover:text-red-600"
                         >
@@ -268,202 +329,257 @@
                 />
             </div>
 
+            <!-- Add new note inputs -->
+            <div class="mb-6 flex gap-4">
+                <div class="flex-1">
+                    <input
+                        bind:value={newNoteContent}
+                        placeholder="New note content"
+                        class="w-full p-3 border rounded-lg shadow-sm"
+                    />
+                    <button
+                        on:click={() =>
+                            selectedFolderId &&
+                            addNoteToFolder(selectedFolderId, newNoteContent)}
+                        class="mt-2 bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
+                    >
+                        Add Note
+                    </button>
+                </div>
+                <div class="flex-1">
+                    <input
+                        bind:value={newTableColumns}
+                        placeholder="Column names (comma-separated)"
+                        class="w-full p-3 border rounded-lg shadow-sm"
+                    />
+                    <button
+                        on:click={() =>
+                            selectedFolderId &&
+                            addTableNoteToFolder(
+                                selectedFolderId,
+                                newTableColumns,
+                            )}
+                        class="mt-2 bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600"
+                    >
+                        Add Table Note
+                    </button>
+                </div>
+            </div>
+
             <!-- Notes list -->
             <div class="space-y-6">
-                {#each filteredFolders.filter(f => f.id === selectedFolderId) as folder}
+                {#each filteredFolders.filter((f) => f.id === selectedFolderId) as folder}
                     <div class="bg-white rounded-lg shadow-md p-6">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-xl font-semibold">{folder.name}</h3>
-                        <div class="flex gap-2">
-                            <input
-                                type="text"
-                                placeholder="Rename folder"
-                                class="p-2 border rounded-md"
-                                on:keydown={(e) =>
-                                    e.key === "Enter" &&
-                                    e.target &&
-                                    renameFolder(
-                                        folder.id,
-                                        (e.target as HTMLInputElement).value,
-                                    )}
-                            />
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-xl font-semibold">{folder.name}</h3>
+                            <div class="flex gap-2">
+                                <input
+                                    type="text"
+                                    placeholder="Rename folder"
+                                    class="p-2 border rounded-md"
+                                    on:keydown={(e) =>
+                                        e.key === "Enter" &&
+                                        e.target &&
+                                        renameFolder(
+                                            folder.id,
+                                            (e.target as HTMLInputElement)
+                                                .value,
+                                        )}
+                                />
+                            </div>
                         </div>
-                    </div>
 
-                    <ul class="space-y-4">
-                        {#each folder.notes as note}
-                            <li
-                                class="bg-gray-50 p-4 rounded-md shadow-md flex justify-between items-start"
-                            >
-                                <div class="flex-1">
-                                    {#if note.type == "simple"}
-                                        {#if editingNoteId === note.id}
-                                            <input
-                                                type="text"
-                                                value={note.content}
-                                                class="w-full p-1 border rounded"
-                                                on:keydown={(e) => {
-                                                    if (e.key === "Enter") {
-                                                        editNote(
-                                                            folder.id,
-                                                            note.id,
-                                                            (
-                                                                e.target as HTMLInputElement
-                                                            ).value,
-                                                        );
-                                                    } else if (
-                                                        e.key === "Escape"
-                                                    ) {
-                                                        editingNoteId = null;
-                                                    }
-                                                }}
-                                            />
+                        <ul class="space-y-4">
+                            {#each folder.notes as note}
+                                <li
+                                    class="bg-gray-50 p-4 rounded-md shadow-md flex justify-between items-start"
+                                >
+                                    <div class="flex-1">
+                                        {#if note.type == "simple"}
+                                            {#if editingNoteId === note.id}
+                                                <input
+                                                    type="text"
+                                                    value={note.content}
+                                                    class="w-full p-1 border rounded"
+                                                    on:keydown={(e) => {
+                                                        if (e.key === "Enter") {
+                                                            editNote(
+                                                                folder.id,
+                                                                note.id,
+                                                                (
+                                                                    e.target as HTMLInputElement
+                                                                ).value,
+                                                            );
+                                                        } else if (
+                                                            e.key === "Escape"
+                                                        ) {
+                                                            editingNoteId =
+                                                                null;
+                                                        }
+                                                    }}
+                                                />
+                                            {:else}
+                                                <div
+                                                    role="button"
+                                                    tabindex="0"
+                                                    on:dblclick={() =>
+                                                        (editingNoteId =
+                                                            note.id)}
+                                                    on:keydown={(e) => {
+                                                        if (e.key === "Enter") {
+                                                            editingNoteId =
+                                                                note.id;
+                                                        }
+                                                    }}
+                                                >
+                                                    {note.content}
+                                                </div>
+                                            {/if}
                                         {:else}
-                                            <div
-                                                role="button"
-                                                tabindex="0"
-                                                on:dblclick={() =>
-                                                    (editingNoteId = note.id)}
-                                                on:keydown={(e) => {
-                                                    if (e.key === "Enter") {
-                                                        editingNoteId = note.id;
-                                                    }
-                                                }}
+                                            <table
+                                                class="min-w-full divide-y divide-gray-200"
                                             >
-                                                {note.content}
-                                            </div>
-                                        {/if}
-                                    {:else}
-                                        <table
-                                            class="min-w-full divide-y divide-gray-200"
-                                        >
-                                            <thead>
-                                                <tr>
-                                                    {#if note.table}
-                                                        {#each note.table.columns as column}
-                                                            <th
-                                                                class="px-4 py-2 font-semibold text-gray-700 border-gray-300 border-t border-b"
-                                                                >{column}</th
-                                                            >
-                                                        {/each}
-                                                    {/if}
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {#if note.table}
-                                                    {#each note.table.rows as row, row_index}
-                                                        <tr>
-                                                            {#each row as cell, cell_index}
-                                                                <td
-                                                                    class="px-4 py-2 border-gray-300 border-t border-b"
+                                                <thead>
+                                                    <tr>
+                                                        {#if note.table}
+                                                            {#each note.table.columns as column}
+                                                                <th
+                                                                    class="px-4 py-2 font-semibold text-gray-700 border-gray-300 border-t border-b"
+                                                                    >{column}</th
                                                                 >
-                                                                    {#if editingCell && editingCell.noteId === note.id && editingCell.rowIndex === row_index && editingCell.colIndex === cell_index}
-                                                                        <input
-                                                                            type="text"
-                                                                            value={cell}
-                                                                            class="w-full p-1 border rounded"
-                                                                            on:keydown={(
-                                                                                e,
-                                                                            ) => {
-                                                                                if (
-                                                                                    e.key ===
-                                                                                    "Enter"
-                                                                                ) {
-                                                                                    editTableCell(
-                                                                                        folder.id,
-                                                                                        note.id,
-                                                                                        row_index,
-                                                                                        cell_index,
-                                                                                        (
-                                                                                            e.target as HTMLInputElement
-                                                                                        )
-                                                                                            .value,
-                                                                                    );
-                                                                                } else if (
-                                                                                    e.key ===
-                                                                                    "Escape"
-                                                                                ) {
-                                                                                    editingCell =
-                                                                                        null;
-                                                                                }
-                                                                            }}
-                                                                        />
-                                                                    {:else}
-                                                                        <div
-                                                                            role="button"
-                                                                            tabindex="0"
-                                                                            on:dblclick={() =>
-                                                                                (editingCell =
-                                                                                    {
-                                                                                        noteId: note.id,
-                                                                                        rowIndex:
+                                                            {/each}
+                                                        {/if}
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {#if note.table}
+                                                        {#each note.table.rows as row, row_index}
+                                                            <tr>
+                                                                {#each row as cell, cell_index}
+                                                                    <td
+                                                                        class="px-4 py-2 border-gray-300 border-t border-b"
+                                                                    >
+                                                                        {#if editingCell && editingCell.noteId === note.id && editingCell.rowIndex === row_index && editingCell.colIndex === cell_index}
+                                                                            <input
+                                                                                type="text"
+                                                                                value={cell}
+                                                                                class="w-full p-1 border rounded"
+                                                                                on:keydown={(
+                                                                                    e,
+                                                                                ) => {
+                                                                                    if (
+                                                                                        e.key ===
+                                                                                        "Enter"
+                                                                                    ) {
+                                                                                        editTableCell(
+                                                                                            folder.id,
+                                                                                            note.id,
                                                                                             row_index,
-                                                                                        colIndex:
                                                                                             cell_index,
-                                                                                    })}
-                                                                            on:keydown={(
-                                                                                e,
-                                                                            ) => {
-                                                                                if (
-                                                                                    e.key ===
-                                                                                    "Enter"
-                                                                                ) {
-                                                                                    editingCell =
+                                                                                            (
+                                                                                                e.target as HTMLInputElement
+                                                                                            )
+                                                                                                .value,
+                                                                                        );
+                                                                                    } else if (
+                                                                                        e.key ===
+                                                                                        "Escape"
+                                                                                    ) {
+                                                                                        editingCell =
+                                                                                            null;
+                                                                                    }
+                                                                                }}
+                                                                            />
+                                                                        {:else}
+                                                                            <div
+                                                                                role="button"
+                                                                                tabindex="0"
+                                                                                class="cursor-pointer hover:bg-gray-50 min-h-[1.5rem] flex items-center justify-start"
+                                                                                title="Double-click to edit"
+                                                                                on:dblclick={() =>
+                                                                                    (editingCell =
                                                                                         {
                                                                                             noteId: note.id,
                                                                                             rowIndex:
                                                                                                 row_index,
                                                                                             colIndex:
                                                                                                 cell_index,
-                                                                                        };
-                                                                                }
-                                                                            }}
-                                                                        >
-                                                                            {cell}
-                                                                        </div>
-                                                                    {/if}
-                                                                </td>
-                                                            {/each}
-                                                        </tr>
-                                                    {/each}
-                                                {/if}
-                                            </tbody>
-                                        </table>
-                                    {/if}
-                                </div>
-                                <button
-                                    on:click={() =>
-                                        deleteNote(folder.id, note.id)}
-                                    class="ml-4 bg-red-500 text-gray-50 px-3 py-1 rounded-md hover:bg-red-600"
-                                    >Delete Note</button
-                                >
-                            </li>
-                        {/each}
-                    </ul>
+                                                                                        })}
+                                                                                on:keydown={(
+                                                                                    e,
+                                                                                ) => {
+                                                                                    if (
+                                                                                        e.key ===
+                                                                                        "Enter"
+                                                                                    ) {
+                                                                                        editingCell =
+                                                                                            {
+                                                                                                noteId: note.id,
+                                                                                                rowIndex:
+                                                                                                    row_index,
+                                                                                                colIndex:
+                                                                                                    cell_index,
+                                                                                            };
+                                                                                    }
+                                                                                }}
+                                                                            >
+                                                                                {cell}
+                                                                            </div>
+                                                                        {/if}
+                                                                    </td>
+                                                                {/each}
+                                                            </tr>
+                                                        {/each}
+                                                    {/if}
+                                                </tbody>
+                                            </table>
+                                            <button
+                                                on:click={() =>
+                                                    addRowToTable(
+                                                        folder.id,
+                                                        note.id,
+                                                    )}
+                                                class="mt-4 bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600"
+                                            >
+                                                Add Row
+                                            </button>
+                                        {/if}
+                                    </div>
+                                    <button
+                                        on:click={() =>
+                                            deleteNote(folder.id, note.id)}
+                                        class="ml-4 bg-red-500 text-gray-50 px-3 py-1 rounded-md hover:bg-red-600"
+                                        >Delete Note</button
+                                    >
+                                </li>
+                            {/each}
+                        </ul>
 
-                    <!-- Add new note -->
-                    <div class="mt-4 flex gap-2">
-                        <input
-                            bind:value={newNoteContent}
-                            type="text"
-                            placeholder="Add new note"
-                            class="flex-1 p-2 border rounded-md"
-                        />
-                        <button
-                            on:click={() =>
-                                addNoteToFolder(folder.id, newNoteContent)}
-                            class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
-                        >
-                            Add Note
-                        </button>
+                        <!-- Add new note -->
+                        <div class="mt-4 flex gap-2">
+                            <input
+                                bind:value={newNoteContent}
+                                type="text"
+                                placeholder="Add new note"
+                                class="flex-1 p-2 border rounded-md"
+                            />
+                            <button
+                                on:click={() =>
+                                    addNoteToFolder(folder.id, newNoteContent)}
+                                class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
+                            >
+                                Add Note
+                            </button>
+                        </div>
                     </div>
-                </div>
-            {/each}
+                {/each}
             </div>
         {:else}
             <div class="flex items-center justify-center h-full">
                 <div class="text-center text-gray-500">
-                    <h2 class="text-2xl font-semibold mb-2">Welcome to Notes App</h2>
+                    <h2 class="text-2xl font-semibold mb-2">
+                        Welcome to Notes App
+                    </h2>
                     <p>Select a folder from the sidebar to view its notes</p>
                 </div>
             </div>
